@@ -1,0 +1,43 @@
+# Based on
+#   https://github.com/facebookresearch/detectron2/tree/main/docker
+#   https://detectron2.readthedocs.io/en/latest/tutorials/install.html#install-pre-built-detectron2-linux-only
+
+FROM nvidia/cuda:11.1.1-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt-get update && apt-get install -y \
+	python3-opencv ca-certificates python3-dev git wget sudo
+RUN ln -sv /usr/bin/python3 /usr/bin/python
+
+# create a non-root user
+ARG USER_ID=1000
+RUN useradd -m --no-log-init --system  --uid ${USER_ID} appuser -g sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER appuser
+WORKDIR /home/appuser
+
+ENV PATH="/home/appuser/.local/bin:${PATH}"
+RUN wget https://bootstrap.pypa.io/get-pip.py && \
+	python3 get-pip.py --user && \
+	rm get-pip.py
+
+# install dependencies
+# See https://pytorch.org/ for other options if you use a different version of CUDA
+RUN pip install --user tensorboard
+RUN pip install --user torch==1.9 torchvision==0.10 -f https://download.pytorch.org/whl/cu111/torch_stable.html
+
+RUN pip install --user 'git+https://github.com/facebookresearch/fvcore'
+
+# Install Pre-Built Detectron2 (Linux only)
+RUN pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu111/torch1.9/index.html
+
+# Set a fixed model cache directory.
+ENV FVCORE_CACHE="/tmp"
+WORKDIR /home/appuser/detectron2_repo
+
+# run detectron2 under user "appuser":
+# wget http://images.cocodataset.org/val2017/000000439715.jpg -O input.jpg
+# python3 demo/demo.py  \
+	#--config-file configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml \
+	#--input input.jpg --output outputs/ \
+	#--opts MODEL.WEIGHTS detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f10217.pkl
